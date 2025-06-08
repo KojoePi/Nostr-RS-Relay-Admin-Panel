@@ -1,111 +1,112 @@
 # Nostr-RS-Relay-Admin-Panel by relayted.de
 EasyBreezy Admin Panel for Nostr-RS-Relays
 
-✨ Features
-Single-File Deployment: The entire application (backend, frontend, styles) is contained in a single Python file for maximum simplicity.
-Web-Based UI: Clean, responsive, and easy-to-use interface with a light theme.
-Bilingual: Switch between German (DE) and English (EN) on the fly add languages easily.
-Live Dashboard: View real-time statistics of your relay, including total events, unique users, and banned users.
-Event Management:
-View the latest events on your relay.
-Search events by pubkey, event ID, or content.
-Delete individual events directly from the UI.
-Live Event Stream: Watch a real-time feed of all events as they arrive at your relay via a direct WebSocket connection.
-User Management:
-Ban misbehaving pubkeys.
-View and manage the list of banned users.
-Unban users.
-Direct Configuration Editor: View and edit your relay's config.toml file directly from the admin panel. (Use with caution!)
-📋 Requirements
-A running instance of nostr-rs-relay.
-Python 3.7+ and pip.
-File system access to the relay's SQLite database (nostr.db) and its configuration file (config.toml).
-🚀 Installation & Setup
+A simple, all-in-one, web-based admin panel for operators of `nostr-rs-relay`. This single-file Python script provides a user-friendly interface for moderation, configuration, and live monitoring of your Nostr relay, with no complex setup required.
+
+## ✨ Features
+
+*   **Single-File Deployment:** The entire application (backend & frontend) is contained in a single Python file for maximum simplicity.
+*   **Direct Access, No Login:** No authentication is built-in. The panel is instantly accessible, making it ideal for use within a secure network or behind a reverse proxy.
+*   **Bilingual Interface:** Switch between German (DE) and English (EN) on the fly.
+*   **Advanced Dashboard:** Get an at-a-glance overview of your relay's health and activity with key statistics:
+    *   **Live Activity:** Events in the last hour and last 24 hours.
+    *   **Growth Metrics:** Total events, unique users, and new users in the last 24 hours.
+    *   **Content Insights:** Top 5 most used event kinds and the percentage of encrypted DMs.
+    *   **System Health:** Database size and the date of the oldest stored event.
+    *   **Top Lists:** See the Top 5 most active users and most common event kinds.
+*   **Event Management:**
+    *   View a paginated list of the latest events.
+    *   Search events by pubkey, event ID, or content.
+    *   Delete individual events directly from the UI.
+*   **Live Event Stream:** Watch a real-time feed of all events as they arrive at your relay, with actions to copy a pubkey, view a profile, or ban a user instantly.
+*   **User Moderation:**
+    *   Ban misbehaving pubkeys.
+    *   View and manage the list of all banned users.
+    *   Unban users.
+*   **Direct Configuration Editor:** View and edit your relay's `config.toml` file directly from the web interface.
+
+## 📋 Requirements
+
+*   A running instance of [nostr-rs-relay](https://git.sr.ht/~gheartsfield/nostr-rs-relay).
+*   Python 3.8+ and `pip`.
+*   File system access to the relay's SQLite database (`nostr.db`) and its configuration file (`config.toml`).
+
+## 🚀 Installation & Setup
+
 Setting up the admin panel is designed to be as straightforward as possible.
 
-1. Download the Script
-Clone this repository or download the admin_panel.py script to your server.
+### 1. Download the Script
 
-bash
-Code kopieren
+Clone this repository or download the `app.py` script to your server.
 
+```bash
 git clone https://github.com/your-username/your-repo-name.git
 cd your-repo-name/
-2. Install Dependencies
+```
+
+### 2. Install Dependencies
+
 It's highly recommended to use a Python virtual environment.
 
-bash
-Code kopieren
-
+```bash
 # Create and activate a virtual environment (optional but recommended)
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # On Windows use `venv\Scripts\activate`
 
 # Install required packages
-pip install Flask flask-cors nostr-sdk toml
-3. Configure the Panel
-Open admin_panel.py in a text editor and modify the configuration section at the top of the file.
+pip install Flask flask-cors toml
+```
 
-python
-Code kopieren
+### 3. Configure the Panel
 
+Open `admin-panel.py` in a text editor and modify the configuration section at the top of the file. **This step is crucial for the panel to function.**
+
+```python
 # ==============================================================================
 # ===== KONFIGURATION (BITTE SORGFÄLTIG ANPASSEN) ==============================
 # ==============================================================================
 
-# 1. Admin Pubkey (Hex-Format)
-# Convert your `npub` to its hex format using a tool like nostr.band.
-# This is the ONLY user who can log in.
-ADMIN_HEX_PUBKEY = "YOUR_64_CHAR_ADMIN_HEX_PUBKEY_HERE" 
+# 1. Path to your nostr-rs-relay database (absolute path recommended)
+DATABASE_PATH = "/path/to/nostr.db"
 
-# 2. Path to your nostr-rs-relay database
-# An absolute path is recommended.
-DATABASE_PATH = "/path/to/your/nostr.db"
+# 2. Path to your nostr-rs-relay config file (absolute path recommended)
+CONFIG_PATH = "/path/to/config.toml"
 
-# 3. Path to your nostr-rs-relay config file
-# Required for the configuration editor feature.
-CONFIG_PATH = "/path/to/your/config.toml"
+# 3. WebSocket URL of your Relay
+RELAY_WEBSOCKET_URL = "wss://your.relay.here"
 
-# 4. WebSocket URL of your Relay
-# Used by the frontend for the live event stream.
-RELAY_WEBSOCKET_URL = "wss://your.relay.url"
-
-# 5. Flask Session Secret Key
-# Change this to a long, random string!
-SECRET_SESSION_KEY = 'change-this-to-a-very-long-random-string'
+# 4. Flask Session Secret Key (generate with `openssl rand -hex 32` in your terminal)
+SECRET_SESSION_KEY = 'a_secure_random_key_here'
 
 # ==============================================================================
-This step is crucial for security and functionality!
+```
 
-▶️ Running the Admin Panel
-Navigate to the directory containing admin_panel.py.
+## ▶️ Running the Admin Panel
 
-Run the script:
+1.  Navigate to the directory containing `admin-panel.py`.
+2.  Ensure your virtual environment is activated (`source venv/bin/activate`).
+3.  Run the script:
 
-bash
-Code kopieren
+    ```bash
+    python admin-panel.py
+    ```
+4.  The admin panel is now accessible in your web browser at **`http://<your-server-ip>:5001`**.
 
-python admin_panel.py
-The admin panel is now accessible in your web browser at http://<your-server-ip>:5001.
+For a production environment, it is recommended to run the Flask application using a production-ready WSGI server like Gunicorn or uWSGI, placed behind a reverse proxy like Nginx.
 
-For a production environment, it is recommended to run the Flask application using a proper WSGI server like Gunicorn or uWSGI, preferably behind a reverse proxy like Nginx.
+## ⚠️ **CRITICAL SECURITY WARNING** ⚠️
 
-⚠️ Security Warning
-This tool provides powerful administrative capabilities. Please be aware of the following:
+This application has **NO BUILT-IN LOGIN OR AUTHENTICATION**. By design, anyone who can access the URL can perform all administrative actions, including deleting events and banning users.
 
-nsec Login: While the private key is not sent to the server, entering it into any web page is inherently risky. Always prefer the NIP-07 browser extension login method. Use the nsec option only if you fully trust the machine hosting this admin panel.
-Configuration Editor: Editing your config.toml directly can be dangerous. A syntax error could prevent your relay from starting. Always make a backup of your config.toml before saving changes through the web UI.
-Firewall: Ensure that port 5001 (or whichever port you use) is properly firewalled and only accessible to you. Running this behind a reverse proxy with TLS and HTTP basic authentication can provide an extra layer of security.
-🔧 How It Works
-The script uses the Flask micro-framework to run a small web server. It serves a single HTML page that contains all the necessary JavaScript and CSS.
+**You MUST secure this panel yourself.** Do not expose it directly to the public internet. Recommended methods include:
 
-Backend (Python/Flask): Provides a REST API for authentication, fetching data from the SQLite database, and performing administrative actions (deleting, banning, saving config).
-Frontend (HTML/JS/CSS): A vanilla JavaScript single-page application that communicates with the backend API. It handles user login (including NIP-07 signing) and dynamically renders all the views and data.
-📝 TODO & Future Ideas
- Add a dark mode theme.
- Implement charts for visualizing relay statistics over time.
- Create a Dockerfile for easy, containerized deployment.
- Add pagination for the events list for very large relays.
- Integrate more directly with nostr-rs-relay's internal mechanisms if they become exposed (e.g., a built-in ban list).
-🤝 Contributing
-Contributions, issues, and feature requests are welcome! Feel free to check the issues page.
+*   **Firewall Rules:** Use `ufw` or your cloud provider's firewall to only allow access from your specific IP address.
+*   **Reverse Proxy with Authentication:** Place the app behind Nginx or Caddy and configure HTTP Basic Authentication (`htpasswd`).
+*   **VPN or SSH Tunnel:** Access the panel only through a private network or an SSH tunnel.
+
+## 🔧 How It Works
+
+The script uses the **Flask** micro-framework to run a small web server. It serves a single HTML page that contains all the necessary JavaScript and CSS.
+
+*   **Backend (Python/Flask):** Provides a REST API for fetching data from the SQLite database and performing administrative actions (deleting, banning, saving config).
+*   **Frontend (Vanilla JS):** A single-page application that communicates with the backend API to dynamically render all views and data.
