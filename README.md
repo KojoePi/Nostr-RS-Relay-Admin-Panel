@@ -2,7 +2,8 @@
 EasyBreezy Admin Panel for Nostr-RS-Relays
 
 A simple, all-in-one, web-based admin panel for operators of `nostr-rs-relay`. This single-file Python script provides a user-friendly interface for moderation, configuration, and live monitoring of your Nostr relay, with no complex setup required.
-https://nostrudel.ninja/c1440aa9-9516-4c89-9c82-c6f0c9310f02
+
+https://aegis.relayted.de/415af1a293a52645268437d49e404c5308b3ab3d599b8db5127bef10291b2b71.png
 ## ✨ Features
 
 *   **Single-File Deployment:** The entire application (backend & frontend) is contained in a single Python file for maximum simplicity.
