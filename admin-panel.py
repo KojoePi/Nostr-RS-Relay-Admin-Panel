@@ -250,7 +250,7 @@ HTML_TEMPLATE = """
 <body>
     <div class="container">
         <header>
-            <h1 data-i18n="title">Nostr Relay Admin</h1>
+            <h1 data-i18n="title">Nostr-rs-Relay Admin by relayted.de</h1>
             <div id="top-controls">
                 <button id="lang-switcher">DE/EN</button>
             </div>
@@ -324,7 +324,7 @@ HTML_TEMPLATE = """
 <script>
 const translations = {
     en: {
-        title: "Nostr Relay Admin", tabDashboard: "Dashboard", tabEvents: "Events", tabStream: "Live Stream", tabBanned: "Banned Users", tabConfig: "Configuration",
+        title: "Nostr-rs-Relay Admin by relayted.de", tabDashboard: "Dashboard", tabEvents: "Events", tabStream: "Live Stream", tabBanned: "Banned Users", tabConfig: "Configuration",
         statTotalEvents: "Total Events", statUniqueUsers: "Unique Users", statBannedUsers: "Banned Users",
         statEvents24h: "Events (24h)", statEvents1h: "Events (1h)", statNewUsers24h: "New Users (24h)",
         statDmPercentage: "Encrypted DMs", statDbSize: "DB Size", statOldestEvent: "Oldest Event",
@@ -341,7 +341,7 @@ const translations = {
         confirmUnban: "Are you sure you want to unban this pubkey?", confirmConfigSave: "Are you sure you want to save the configuration? This could break your relay if incorrect."
     },
     de: {
-        title: "Nostr Relay Admin-Panel", tabDashboard: "Dashboard", tabEvents: "Events", tabStream: "Live-Stream", tabBanned: "Gesperrte Nutzer", tabConfig: "Konfiguration",
+        title: "Nostr-rs-Relay Admin-Panel by relayted.de", tabDashboard: "Dashboard", tabEvents: "Events", tabStream: "Live-Stream", tabBanned: "Gesperrte Nutzer", tabConfig: "Konfiguration",
         statTotalEvents: "Events gesamt", statUniqueUsers: "Eind. Nutzer", statBannedUsers: "Gesperrte Nutzer",
         statEvents24h: "Events (24h)", statEvents1h: "Events (1h)", statNewUsers24h: "Neue Nutzer (24h)",
         statDmPercentage: "Verschl. DMs", statDbSize: "DB Größe", statOldestEvent: "Ältestes Event",
