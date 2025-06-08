@@ -1,10 +1,10 @@
-# Nostr-RS-Relay-Admin-Panel
-EasyBreezy Admin Panel for Nostr-RS-Relay
+# Nostr-RS-Relay-Admin-Panel by relayted.de
+EasyBreezy Admin Panel for Nostr-RS-Relays
 
 ✨ Features
 Single-File Deployment: The entire application (backend, frontend, styles) is contained in a single Python file for maximum simplicity.
 Web-Based UI: Clean, responsive, and easy-to-use interface with a light theme.
-Bilingual: Switch between German (DE) and English (EN) on the fly.
+Bilingual: Switch between German (DE) and English (EN) on the fly add languages easily.
 Live Dashboard: View real-time statistics of your relay, including total events, unique users, and banned users.
 Event Management:
 View the latest events on your relay.
