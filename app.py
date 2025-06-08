@@ -12,13 +12,13 @@ from datetime import timedelta
 # ==============================================================================
 
 # 1. Pfad zur Datenbank deines nostr-rs-relay
-DATABASE_PATH = "/root/relay/data/relay/nostr.db"
+DATABASE_PATH = "/path/to/nostr.db"
 
 # 2. Pfad zur Konfigurationsdatei deines nostr-rs-relay
-CONFIG_PATH = "/root/relay/config/config.toml"
+CONFIG_PATH = "/path/to/config.toml"
 
 # 3. WebSocket URL deines Relays
-RELAY_WEBSOCKET_URL = "wss://free.relayted.de"
+RELAY_WEBSOCKET_URL = "wss://your.relay"
 
 # 4. Geheimer Schlüssel für die Flask-Session (weniger wichtig ohne Login)
 SECRET_SESSION_KEY = 'ae89fe77832801b49ac5eac28ac2a637b323fafef2995eb9fc0ea845b9ae8a6f'
