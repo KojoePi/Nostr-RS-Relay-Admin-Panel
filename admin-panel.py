@@ -1,9 +1,11 @@
 import sqlite3
 import json
 import toml
+import os
+from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
-from datetime import timedelta
+
 
 # ==============================================================================
 # ===== KONFIGURATION (BITTE SORGFÄLTIG ANPASSEN) ==============================
@@ -16,10 +18,10 @@ DATABASE_PATH = "/path/to/nostr.db"
 CONFIG_PATH = "/path/to/config.toml"
 
 # 3. WebSocket URL deines Relays
-RELAY_WEBSOCKET_URL = "wss://your.relay.here"
+RELAY_WEBSOCKET_URL = "wss://your-relay.here"
 
 # 4. Geheimer Schlüssel für die Flask-Session (Im Terminal mit openssl rand -hex 32)
-SECRET_SESSION_KEY = 'sicheren key generieren'
+SECRET_SESSION_KEY = 'replacewithsecureone'
 
 # ==============================================================================
 # ===== ENDE DER KONFIGURATION =================================================
@@ -53,27 +55,67 @@ def setup_database():
     conn.commit()
     conn.close()
 
+def format_db_size(size_bytes):
+    """Formatiert Bytes in ein lesbares Format."""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024**2:
+        return f"{round(size_bytes / 1024, 2)} KB"
+    elif size_bytes < 1024**3:
+        return f"{round(size_bytes / (1024**2), 2)} MB"
+    else:
+        return f"{round(size_bytes / (1024**3), 2)} GB"
+
 # --- API Endpunkte ---
 
 @app.route('/api/stats')
 def get_stats():
     conn, conn_rw = None, None
-    banned_count, total_events, distinct_pubkeys = 0, 0, 0
+    stats = {}
     try:
         conn = get_db_connection()
-        total_events_row = conn.execute('SELECT COUNT(*) FROM event').fetchone()
-        distinct_pubkeys_row = conn.execute('SELECT COUNT(DISTINCT author) FROM event').fetchone()
-        total_events = total_events_row[0] if total_events_row else 0
-        distinct_pubkeys = distinct_pubkeys_row[0] if distinct_pubkeys_row else 0
+        cursor = conn.cursor()
+
+        # Zeitstempel für Abfragen
+        now_ts = int(datetime.now().timestamp())
+        ts_24h_ago = now_ts - (24 * 3600)
+        ts_1h_ago = now_ts - 3600
+
+        # Basis-Statistiken
+        stats['total_events'] = cursor.execute('SELECT COUNT(*) FROM event').fetchone()[0] or 0
+        stats['distinct_pubkeys'] = cursor.execute('SELECT COUNT(DISTINCT author) FROM event').fetchone()[0] or 0
+        
+        # Aktivitäts-Statistiken
+        stats['events_24h'] = cursor.execute('SELECT COUNT(*) FROM event WHERE created_at > ?', (ts_24h_ago,)).fetchone()[0] or 0
+        stats['events_1h'] = cursor.execute('SELECT COUNT(*) FROM event WHERE created_at > ?', (ts_1h_ago,)).fetchone()[0] or 0
+        stats['new_users_24h'] = cursor.execute("SELECT COUNT(*) FROM (SELECT MIN(created_at) as first_seen FROM event GROUP BY author) WHERE first_seen > ?", (ts_24h_ago,)).fetchone()[0] or 0
+        
+        # Inhalts-Statistiken
+        stats['top_kinds'] = [dict(row) for row in cursor.execute("SELECT kind, COUNT(*) as count FROM event GROUP BY kind ORDER BY count DESC LIMIT 5").fetchall()]
+        dm_count = cursor.execute("SELECT COUNT(*) FROM event WHERE kind = 4").fetchone()[0] or 0
+        stats['dm_percentage'] = round((dm_count / stats['total_events']) * 100, 2) if stats['total_events'] > 0 else 0
+
+        # Nutzer-Statistiken
+        top_users_query = cursor.execute("SELECT lower(hex(author)) as pubkey, COUNT(*) as count FROM event GROUP BY author ORDER BY count DESC LIMIT 5").fetchall()
+        stats['top_users'] = [dict(row) for row in top_users_query]
+
+        # System-Statistiken
+        oldest_event_ts = cursor.execute("SELECT MIN(created_at) FROM event").fetchone()[0]
+        stats['oldest_event_date'] = datetime.fromtimestamp(oldest_event_ts).strftime('%d. %b %Y') if oldest_event_ts else "N/A"
+        
         conn_rw = get_db_connection_rw()
-        banned_count_row = conn_rw.execute('SELECT COUNT(*) FROM banned_pubkeys').fetchone()
-        banned_count = banned_count_row[0] if banned_count_row else 0
+        stats['banned_pubkeys'] = conn_rw.execute('SELECT COUNT(*) FROM banned_pubkeys').fetchone()[0] or 0
+        
+        stats['db_size'] = format_db_size(os.path.getsize(DATABASE_PATH)) if os.path.exists(DATABASE_PATH) else "N/A"
+
     except Exception as e:
         print(f"Error fetching stats: {e}")
+        return jsonify({"error": str(e)}), 500
     finally:
         if conn: conn.close()
         if conn_rw: conn_rw.close()
-    return jsonify({"total_events": total_events, "distinct_pubkeys": distinct_pubkeys, "banned_pubkeys": banned_count})
+    return jsonify(stats)
+
 
 @app.route('/api/events')
 def get_events():
@@ -81,9 +123,7 @@ def get_events():
     limit = int(request.args.get('limit', 100))
     conn = get_db_connection()
     try:
-        # FINALE KORREKTUR: Umwandlung von bytes in hex-Strings für author und event_hash
         select_clause = 'SELECT id, lower(hex(author)) as pubkey, kind, content, created_at, lower(hex(event_hash)) as event_id FROM event'
-        
         if query:
             search_query_hex = f'%{query}%'
             cursor = conn.execute(
@@ -92,7 +132,6 @@ def get_events():
             )
         else:
             cursor = conn.execute(f'{select_clause} ORDER BY created_at DESC LIMIT ?', (limit,))
-        
         events = [dict(row) for row in cursor.fetchall()]
     except sqlite3.Error as e:
         print(f"Database error in get_events: {e}")
@@ -202,6 +241,7 @@ HTML_TEMPLATE = """
         .stat-card { background: var(--bg-color); padding: 1.5rem; border-radius: 8px; text-align: center; }
         .stat-card .value { font-size: 2.5rem; font-weight: bold; color: var(--primary-color); }
         .stat-card .label { font-size: 1rem; color: #6c757d; }
+        .dashboard-section { margin-top: 2rem; }
         #config-editor { width: 100%; min-height: 60vh; font-family: monospace; font-size: 14px; line-height: 1.5; }
         #banned-list { list-style: none; padding: 0; }
         #banned-list li { display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #f1f3f5; border-radius: 4px; margin-bottom: 5px; font-family: monospace; }
@@ -215,6 +255,7 @@ HTML_TEMPLATE = """
                 <button id="lang-switcher">DE/EN</button>
             </div>
         </header>
+
         <div id="admin-view">
             <nav class="tabs">
                 <button class="tab-button active" data-tab="dashboard" data-i18n="tabDashboard">Dashboard</button>
@@ -223,13 +264,38 @@ HTML_TEMPLATE = """
                 <button class="tab-button" data-tab="banned" data-i18n="tabBanned">Banned Users</button>
                 <button class="tab-button" data-tab="config" data-i18n="tabConfig">Configuration</button>
             </nav>
+            <!-- ########## START DASHBOARD CONTENT ########## -->
             <div id="dashboard-content" class="tab-content active">
                 <div class="stats-grid">
                     <div class="stat-card"><div id="stats-total-events" class="value">...</div><div class="label" data-i18n="statTotalEvents">Total Events</div></div>
                     <div class="stat-card"><div id="stats-distinct-pubkeys" class="value">...</div><div class="label" data-i18n="statUniqueUsers">Unique Users</div></div>
-                    <div class="stat-card"><div id="stats-banned-pubkeys" class="value">...</div><div class="label" data-i18n="statBannedUsers">Banned Users</div></div>
+                    <div class="stat-card"><div id="stats-events-24h" class="value">...</div><div class="label" data-i18n="statEvents24h">Events (24h)</div></div>
+                    <div class="stat-card"><div id="stats-events-1h" class="value">...</div><div class="label" data-i18n="statEvents1h">Events (1h)</div></div>
+                    <div class="stat-card"><div id="stats-new-users-24h" class="value">...</div><div class="label" data-i18n="statNewUsers24h">New Users (24h)</div></div>
+                    <div class="stat-card"><div id="stats-dm-percentage" class="value">...</div><div class="label" data-i18n="statDmPercentage">Encrypted DMs</div></div>
+                    <div class="stat-card"><div id="stats-db-size" class="value">...</div><div class="label" data-i18n="statDbSize">DB Size</div></div>
+                    <div class="stat-card"><div id="stats-oldest-event" class="value">...</div><div class="label" data-i18n="statOldestEvent">Oldest Event</div></div>
+                </div>
+
+                <div class="stats-grid dashboard-section" style="grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <div>
+                        <h3 data-i18n="titleTopKinds">Top 5 Event Kinds</h3>
+                        <table id="top-kinds-table">
+                            <thead><tr><th data-i18n="colKind">Kind</th><th data-i18n="colCount">Count</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div>
+                        <h3 data-i18n="titleTopUsers">Top 5 Busiest Users</h3>
+                        <table id="top-users-table">
+                             <thead><tr><th data-i18n="colPubkey">Pubkey</th><th data-i18n="colCount">Event Count</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+            <!-- ########## END DASHBOARD CONTENT ########## -->
+
             <div id="events-content" class="tab-content">
                 <input type="text" id="event-search" placeholder="Search" data-i18n-placeholder="eventSearchPlaceholder" style="margin-bottom: 1rem;">
                 <table id="events-table">
@@ -260,6 +326,10 @@ const translations = {
     en: {
         title: "Nostr Relay Admin", tabDashboard: "Dashboard", tabEvents: "Events", tabStream: "Live Stream", tabBanned: "Banned Users", tabConfig: "Configuration",
         statTotalEvents: "Total Events", statUniqueUsers: "Unique Users", statBannedUsers: "Banned Users",
+        statEvents24h: "Events (24h)", statEvents1h: "Events (1h)", statNewUsers24h: "New Users (24h)",
+        statDmPercentage: "Encrypted DMs", statDbSize: "DB Size", statOldestEvent: "Oldest Event",
+        titleTopKinds: "Top 5 Event Kinds", titleTopUsers: "Top 5 Busiest Users",
+        colCount: "Count",
         eventSearchPlaceholder: "Search by pubkey, event ID, or content...",
         colTime: "Time", colPubkey: "Pubkey", colKind: "Kind", colContent: "Content", colActions: "Actions", colActionsLive: "Actions",
         deleteAction: "Delete", banAction: "Ban", unbanAction: "Unban", actionCopy: "Copy Pubkey", actionView: "View Profile",
@@ -273,6 +343,10 @@ const translations = {
     de: {
         title: "Nostr Relay Admin-Panel", tabDashboard: "Dashboard", tabEvents: "Events", tabStream: "Live-Stream", tabBanned: "Gesperrte Nutzer", tabConfig: "Konfiguration",
         statTotalEvents: "Events gesamt", statUniqueUsers: "Eind. Nutzer", statBannedUsers: "Gesperrte Nutzer",
+        statEvents24h: "Events (24h)", statEvents1h: "Events (1h)", statNewUsers24h: "Neue Nutzer (24h)",
+        statDmPercentage: "Verschl. DMs", statDbSize: "DB Größe", statOldestEvent: "Ältestes Event",
+        titleTopKinds: "Top 5 Event-Arten", titleTopUsers: "Top 5 Aktivste Nutzer",
+        colCount: "Anzahl",
         eventSearchPlaceholder: "Suche nach Pubkey, Event-ID oder Inhalt...",
         colTime: "Zeit", colPubkey: "Pubkey", colKind: "Art", colContent: "Inhalt", colActions: "Aktionen", colActionsLive: "Aktionen",
         deleteAction: "Löschen", banAction: "Sperren", unbanAction: "Entsperren", actionCopy: "Pubkey kopieren", actionView: "Profil ansehen",
@@ -289,11 +363,9 @@ const setLanguage = (lang) => {
     currentLang = lang;
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
-        if (translations[lang] && translations[lang][key]) el.innerHTML = translations[lang][key];
-    });
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-        const key = el.getAttribute('data-i18n-placeholder');
-        if (translations[lang] && translations[lang][key]) el.placeholder = translations[lang][key];
+        if (translations[lang] && translations[lang][key]) {
+            el.innerHTML = translations[lang][key];
+        }
     });
 };
 document.addEventListener('DOMContentLoaded', () => {
@@ -333,12 +405,37 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadDashboard() {
         try {
             const stats = await apiCall('/api/stats');
+            if (stats.error) throw new Error(stats.error);
+            // Populate stat cards
             document.getElementById('stats-total-events').textContent = stats.total_events || '0';
             document.getElementById('stats-distinct-pubkeys').textContent = stats.distinct_pubkeys || '0';
-            document.getElementById('stats-banned-pubkeys').textContent = stats.banned_pubkeys || '0';
-        } catch (e) {
-            console.error("Failed to load dashboard stats:", e);
-        }
+            document.getElementById('stats-events-24h').textContent = stats.events_24h || '0';
+            document.getElementById('stats-events-1h').textContent = stats.events_1h || '0';
+            document.getElementById('stats-new-users-24h').textContent = stats.new_users_24h || '0';
+            document.getElementById('stats-dm-percentage').textContent = `${stats.dm_percentage}%`;
+            document.getElementById('stats-db-size').textContent = stats.db_size || 'N/A';
+            document.getElementById('stats-oldest-event').textContent = stats.oldest_event_date || 'N/A';
+
+            // Populate top kinds table
+            const kindsTbody = document.querySelector('#top-kinds-table tbody');
+            kindsTbody.innerHTML = '';
+            stats.top_kinds.forEach(k => {
+                const row = kindsTbody.insertRow();
+                row.innerHTML = `<td>${k.kind}</td><td>${k.count}</td>`;
+            });
+
+            // Populate top users table
+            const usersTbody = document.querySelector('#top-users-table tbody');
+            usersTbody.innerHTML = '';
+            stats.top_users.forEach(u => {
+                const row = usersTbody.insertRow();
+                const pubkeyCell = row.insertCell();
+                pubkeyCell.innerHTML = `<a href="javascript:viewProfile('${u.pubkey}')">${u.pubkey.substring(0,10)}...</a>`;
+                const countCell = row.insertCell();
+                countCell.textContent = u.count;
+            });
+
+        } catch (e) { console.error("Failed to load dashboard stats:", e); }
     }
 
     async function loadEvents(query = '') {
@@ -364,8 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }
         } catch (e) {
-             console.error("Failed to load events:", e);
-             tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">${translations[currentLang].error} Daten konnten nicht geladen werden. Fehler im Terminal prüfen.</td></tr>`;
+             tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;" class="error">${translations[currentLang].error} Daten konnten nicht geladen werden.</td></tr>`;
         }
     }
 
@@ -434,8 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => { btn.textContent = originalText; btn.disabled = false; }, 1500);
             });
         } else {
-            // Fallback für unsichere Kontexte (HTTP)
-            prompt("Copy this pubkey manually (Ctrl+C):", pubkey);
+            prompt("Copy manually (Ctrl+C):", pubkey);
         }
     };
 
