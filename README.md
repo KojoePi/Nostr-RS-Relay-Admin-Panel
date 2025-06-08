@@ -5,9 +5,6 @@ EasyBreezy Admin Panel for Nostr-RS-Relay
 Single-File Deployment: The entire application (backend, frontend, styles) is contained in a single Python file for maximum simplicity.
 Web-Based UI: Clean, responsive, and easy-to-use interface with a light theme.
 Bilingual: Switch between German (DE) and English (EN) on the fly.
-Secure Authentication:
-NIP-07: Secure login using browser extensions like Alby, nos2x, or Coracle.
-nsec Login: Option to log in with a private key (nsec), which is only used client-side to sign a challenge and is never sent to the server.
 Live Dashboard: View real-time statistics of your relay, including total events, unique users, and banned users.
 Event Management:
 View the latest events on your relay.
