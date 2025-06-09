@@ -21,7 +21,7 @@ CONFIG_PATH = "/path/to/config.toml"
 RELAY_WEBSOCKET_URL = "wss://your.relay.here"
 
 # 4. Geheimer Schlüssel für die Flask-Session
-SECRET_SESSION_KEY = 'mit "openssl rand -hex 32" im Terninal generieren'
+SECRET_SESSION_KEY = 'generate with "openssl rand -hex 32" in terminal'
 
 # ==============================================================================
 # ===== ENDE DER KONFIGURATION =================================================
@@ -180,7 +180,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nostr Relay Admin by relayted.de</title>
+    <title>Nostr Relay Admin</title>
     <script src="https://unpkg.com/nostr-tools@2/lib/nostr.js"></script>
     <style>
         body[data-theme-color="blue"] { --primary: #007bff; }
@@ -352,7 +352,8 @@ HTML_TEMPLATE = """
             return response.json();
         };
         const escapeHtml = (text) => (typeof text=='string' ? text.replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'})[m]) : '');
-        const renderNoteContent = (content) => (typeof content=='string' ? escapeHtml(content).replace(/(https?:\/\/[^\\s]+\\.(?:jpg|jpeg|png|gif|webp|avif))/gi, url => `<br><a href="${url}" target="_blank" rel="noopener noreferrer"><img src="${url}" loading="lazy"></a>`) : '');
+        // KORREKTUR der Regex-Warnung
+        const renderNoteContent = (content) => (typeof content=='string' ? escapeHtml(content).replace(/(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|webp|avif))/gi, url => `<br><a href="${url}" target="_blank" rel="noopener noreferrer"><img src="${url}" loading="lazy"></a>`) : '');
         
         async function loadDashboard() {
             try {
@@ -371,8 +372,8 @@ HTML_TEMPLATE = """
                 kindsTable.innerHTML = `<thead><tr><th data-i18n="colKind"></th><th data-i18n="colCount"></th></tr></thead><tbody>` + stats.top_kinds.map(k => `<tr><td>Kind ${k.kind}</td><td>${k.count.toLocaleString()}</td></tr>`).join('') + `</tbody>`;
                 const usersTable = document.querySelector('#top-users-table');
                 usersTable.innerHTML = `<thead><tr><th data-i18n="colPubkey"></th><th data-i18n="colCount"></th></tr></thead><tbody>` + stats.top_users.map(u => `<tr><td><a href="#" onclick="viewProfile('${u.pubkey}'); return false;">${u.pubkey.substring(0,15)}...</a></td><td>${u.count.toLocaleString()}</td></tr>`).join('') + `</tbody>`;
-                setLanguage(currentLang);
             } catch(e) { console.error("Dashboard Error:", e); }
+            setLanguage(currentLang);
         }
 
         async function loadEvents(query = '') {
@@ -396,11 +397,10 @@ HTML_TEMPLATE = """
                         </td>
                     </tr>`).join('');
                 table.innerHTML = tableHTML + `</tbody>`;
-                 setLanguage(currentLang);
             } catch (e) {
                  table.innerHTML = `<tbody><tr><td colspan="5" style="text-align:center;">${translations[currentLang].error}</td></tr></tbody>`;
-                 setLanguage(currentLang);
             }
+            setLanguage(currentLang);
         }
         
         let liveStreamSocket;
@@ -476,8 +476,13 @@ HTML_TEMPLATE = """
 
         window.viewProfile = (pubkey) => {
             if (typeof pubkey === 'string' && pubkey.length === 64) {
-                const npub = NostrTools.nip19.npubEncode(pubkey);
-                window.open(`https://nosta.me/${npub}`, '_blank');
+                try {
+                    const npub = NostrTools.nip19.npubEncode(pubkey);
+                    window.open(`https://nosta.me/${npub}`, '_blank');
+                } catch(e) {
+                    console.error("Could not encode pubkey:", e);
+                    window.open(`https://nosta.me/${pubkey}`, '_blank');
+                }
             }
         };
 
@@ -503,6 +508,7 @@ HTML_TEMPLATE = """
             }
         };
 
+        // --- THEME & UI INITIALIZATION ---
         const docBody = document.body;
         const colorBoxes = document.querySelectorAll('.color-box');
         const themeToggleButton = document.getElementById('theme-toggle-btn');
@@ -520,6 +526,7 @@ HTML_TEMPLATE = """
         
         const savedMode = localStorage.getItem('themeMode') || 'light';
         const savedColor = localStorage.getItem('colorTheme') || 'blue';
+        applyTheme(savedMode, savedColor);
         
         themeToggleButton.addEventListener('click', () => {
              const newMode = docBody.dataset.themeMode === 'light' ? 'dark' : 'light';
@@ -554,7 +561,7 @@ HTML_TEMPLATE = """
 
         document.getElementById('event-search').addEventListener('input', (e) => loadEvents(e.target.value));
 
-        applyTheme(savedMode, savedColor);
+        // Initial Load
         setLanguage('de');
         loadDashboard();
     });
@@ -566,4 +573,4 @@ HTML_TEMPLATE = """
 # --- Hauptausführung ---
 if __name__ == '__main__':
     setup_database()
-    app.run(host='0.0.0.0', port=5111, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)
